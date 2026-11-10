@@ -1,0 +1,68 @@
+name: hadoop-codespaces-lab
+
+# 수업용 경량 Apache Hadoop 클러스터
+# 기본: NameNode + DataNode 2대 (HDFS)
+# 선택: docker compose --profile mapreduce up -d  → YARN 추가
+# 주의: 도커 컨테이너를 삭제(down)하면 HDFS 실습 데이터도 삭제됩니다.
+
+x-hadoop-image: &hadoop-image apache/hadoop:3.4.3
+x-hadoop-env: &hadoop-env
+  env_file:
+    - ./hadoop.env
+
+services:
+  namenode:
+    image: *hadoop-image
+    hostname: namenode
+    <<: *hadoop-env
+    command: ["hdfs", "namenode"]
+    environment:
+      ENSURE_NAMENODE_DIR: /tmp/hadoop-root/dfs/name
+      HDFS_NAMENODE_OPTS: "-Xms128m -Xmx512m"
+    ports:
+      - "9870:9870"  # HDFS NameNode Web UI: Codespaces '포트' 탭에서 열기
+
+  datanode1:
+    image: *hadoop-image
+    hostname: datanode1
+    <<: *hadoop-env
+    command: ["hdfs", "datanode"]
+    environment:
+      HDFS_DATANODE_OPTS: "-Xms128m -Xmx384m"
+    depends_on:
+      - namenode
+
+  datanode2:
+    image: *hadoop-image
+    hostname: datanode2
+    <<: *hadoop-env
+    command: ["hdfs", "datanode"]
+    environment:
+      HDFS_DATANODE_OPTS: "-Xms128m -Xmx384m"
+    depends_on:
+      - namenode
+
+  # 심화 실습: YARN ResourceManager/NodeManager 2개 추가
+  resourcemanager:
+    image: *hadoop-image
+    hostname: resourcemanager
+    <<: *hadoop-env
+    profiles: ["mapreduce"]
+    command: ["yarn", "resourcemanager"]
+    environment:
+      YARN_RESOURCEMANAGER_OPTS: "-Xms128m -Xmx384m"
+    ports:
+      - "8088:8088"  # YARN ResourceManager Web UI
+    depends_on:
+      - namenode
+
+  nodemanager:
+    image: *hadoop-image
+    hostname: nodemanager
+    <<: *hadoop-env
+    profiles: ["mapreduce"]
+    command: ["yarn", "nodemanager"]
+    environment:
+      YARN_NODEMANAGER_OPTS: "-Xms128m -Xmx384m"
+    depends_on:
+      - resourcemanager
